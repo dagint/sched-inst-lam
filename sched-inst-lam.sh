@@ -140,27 +140,42 @@ StartEvntSrcArn=`aws events describe-rule --name=StartEvent7amEst --query 'Arn'|
 
 
 #Add permissions to allow event source to excute lambda function
-aws lambda add-permission --function-name stop-instances \
---statement-id stop-instances --action 'lambda:InvokeFunction' \
---principal events.amazonaws.com \
---source-arn $StopEvntSrcArn
+if aws lambda get-policy --function-name=stop-instances |grep stop-instances |grep events.amazonaws.com |grep Invoke 2>&1 >/dev/null; then
+	echo '*** Lambda stop-instances event source permissions are set'
+else 
+    aws lambda add-permission --function-name stop-instances \
+    --statement-id stop-instances --action 'lambda:InvokeFunction' \
+    --principal events.amazonaws.com \
+    --source-arn $StopEvntSrcArn
+fi
 
 #Add permissions to allow event source to excute lambda function
-aws lambda add-permission --function-name start-instances \
---statement-id start-instances --action 'lambda:InvokeFunction' \
---principal events.amazonaws.com \
---source-arn $StartEvntSrcArn
+if aws lambda get-policy --function-name=start-instances |grep start-instances |grep events.amazonaws.com |grep Invoke 2>&1 >/dev/null; then
+	echo '*** Lambda start-instances event source permissions are set'
+else 
+	aws lambda add-permission --function-name start-instances \
+    --statement-id start-instances --action 'lambda:InvokeFunction' \
+    --principal events.amazonaws.com \
+    --source-arn $StartEvntSrcArn
+fi
 
 #Associate event rule with lambda function
-aws events put-targets \
---rule StopEvent5pmEst \
---targets '{"Id" : "1", "Arn": "'$StopInstArn'"}'
+if aws events list-targets-by-rule --rule StopEvent5pmEst --query 'Targets[*].Arn' |grep -i stop-instances 2>&1 >/dev/null; then
+	echo '*** Stop event rule already associated to lambda function'
+else
+    aws events put-targets \
+    --rule StopEvent5pmEst \
+    --targets '{"Id" : "1", "Arn": "'$StopInstArn'"}'
+fi
 
 #Associate event rule with lambda function
-aws events put-targets \
---rule StartEvent7amEst \
---targets '{"Id" : "1", "Arn": "'$StartInstArn'"}'
-
+if aws events list-targets-by-rule --rule StartEvent7amEst --query 'Targets[*].Arn' |grep -i start-instances 2>&1 >/dev/null; then
+	echo '*** Start event rule already associated to lambda function'
+else
+    aws events put-targets \
+    --rule StartEvent7amEst \
+    --targets '{"Id" : "1", "Arn": "'$StartInstArn'"}'
+fi
 
 echo '\n'ARN REPORT:'\n'
 echo Lambda Policy ARN:'\t\t'$LamPolArn
