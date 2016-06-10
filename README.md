@@ -6,7 +6,7 @@ Reference: https://www.nimbo.com/blog/automating-ec2-tasks-with-aws-lambda/
 ## Prerequisities
 - requires python 2.6.5 or above
 - python would need to be in the path
-- Most recent version of aws cli.  1.10.34 currently works with this script
+- Most recent version of aws cli.  1.10.17 currently works with this script
 - Your AWS CLI credentails configured for a user with rights to perform steps outlined in the reference url above
 - all files included should be in the same directory as the script sched-inst-iam.sh
 
