@@ -1,0 +1,172 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Parameters": {
+		"StopLamFuncName": {
+			"Type": "String",
+			"Description": "Stop instances lambda function name",
+			"Default": "stop-instances",
+			"MinLength": "1",
+			"MaxLength": "140"
+		},
+		"StartLamFuncName": {
+			"Type": "String",
+			"Description": "Start instances lambda function name",
+			"Default": "start-instances",
+			"MinLength": "1",
+			"MaxLength": "140"
+		},
+		"StopEventName": {
+			"Type": "String",
+			"Description": "Stop Cloudwatch Event Name",
+			"Default": "StopEventXpmUTC",
+			"MinLength": "1",
+			"MaxLength": "64"
+		},
+		"StartEventName": {
+			"Type": "String",
+			"Description": "Start Cloudwatch Event Name",
+			"Default": "StartEventXpmUTC",
+			"MinLength": "1",
+			"MaxLength": "64"
+		},
+		"StartEventExpression": {
+			"Type": "String",
+			"Description": "Start Cloudwatch Event Schedule Expression",
+			"Default": "cron(0 11 ? * MON-FRI *)",
+			"MinLength": "1",
+			"MaxLength": "256"
+		},
+		"StopEventExpression": {
+			"Type": "String",
+			"Description": "Start Cloudwatch Event Schedule Expression",
+			"Default": "cron(0 21 ? * MON-FRI *)",
+			"MinLength": "1",
+			"MaxLength": "256"
+		},
+		"TagName": {
+			"Type": "String",
+			"Description": "Tag Name to be used to trigger instance stop & start",
+			"Default": "AutoOff",
+			"MinLength": "1",
+			"MaxLength": "127"
+		},
+		"TagValue": {
+			"Type": "String",
+			"Description": "Tag Value to be used to trigger instance stop & start",
+			"Default": "True",
+			"MaxLength": "255"
+		}
+	},
+	"Resources": {
+		"SchedInstLamRole": {
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "lambda.amazonaws.com"
+						},
+						"Action": "sts:AssumeRole"
+					}]
+				},
+				"PolicyName": "Sched-Instances-Lambda-Role",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Action": [
+							"ec2:Describe*"
+						],
+						"Resource": "*"
+					}, {
+						"Effect": "Allow",
+						"Action": [
+							"logs:CreateLogGroup",
+							"logs:CreateLogStream",
+							"logs:PutLogEvents"
+						],
+						"Resource": "arn:aws:logs:*:*:*"
+					}, {
+						"Effect": "Allow",
+						"Action": [
+							"ec2:Describe*",
+							"ec2:StartInstances",
+							"ec2:StopInstances",
+							"ec2:RebootInstances"
+						],
+						"Condition": {
+							"StringEquals": {
+								"ec2:ResourceTag/AutoOff": "True"
+							}
+						},
+						"Resource": "*"
+					}]
+				}
+			}
+		},
+		"StopLamFunc": {
+			"Type": "AWS::Lambda::Function",
+			"Properties": {
+				"Handler": {
+					"Fn::Join": ["", [{
+						"Ref": "StopLamFuncName"
+					}, ".lambda_handler"]]
+				},
+				"Role": {
+					"Fn::GetAtt": ["SchedInstLamRole", "Arn"]
+				},
+				"Runtime": "python2.7",
+				"Timeout": "60",
+				"Code": {
+					"ZipFile": {
+						"Fn::Join": ["", [
+							"import boto3",
+							"import logging",
+
+							"# setup simple logging",
+							"for INFO",
+							"logger = logging.getLogger()",
+							"logger.setLevel(logging.INFO)",
+
+							"#define the connection",
+							"ec2 = boto3.resource('ec2')",
+
+							"def lambda_handler(event, context): #Use the filter() method of the instances collection to retrieve# all running EC2 instances.",
+							"filters = [{",
+							"'Name': 'tag:", {
+								"Ref": "TagName"
+							}, "',",
+							"'Values': ['", {
+								"Ref": "TagValue"
+							}, "']",
+							"}, {",
+							"'Name': 'instance-state-name',",
+							"'Values': ['running']",
+							"}]",
+
+							"# filter the instances",
+							"instances = ec2.instances.filter(Filters = filters)",
+
+							"# locate all running instances",
+							"RunningInstances = [instance.id for instance in instances]",
+
+							"# print the instances",
+							"for logging purposes# print RunningInstances",
+
+							"# make sure there are actually instances to shut down.",
+							"if len(RunningInstances) > 0: #perform the shutdown",
+							"shuttingDown = ec2.instances.filter(InstanceIds = RunningInstances).stop()",
+							"print shuttingDown",
+							"else :",
+							"print \"Nothing to see here\""
+						]]
+
+					}
+				}
+			}
+		}
+	}
+
+}
