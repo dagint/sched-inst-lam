@@ -133,7 +133,8 @@
 							"#define the connection",
 							"ec2 = boto3.resource('ec2')",
 
-							"def lambda_handler(event, context): #Use the filter() method of the instances collection to retrieve# all running EC2 instances.",
+							"def lambda_handler(event, context):",
+							"#Use the filter() method of the instances collection to retrieve# all running EC2 instances.",
 							"filters = [{",
 							"'Name': 'tag:", {
 								"Ref": "TagName"
@@ -152,8 +153,8 @@
 							"# locate all running instances",
 							"RunningInstances = [instance.id for instance in instances]",
 
-							"# print the instances",
-							"for logging purposes# print RunningInstances",
+							"# print the instances for logging purposes",
+							"# print RunningInstances",
 
 							"# make sure there are actually instances to shut down.",
 							"if len(RunningInstances) > 0: #perform the shutdown",
@@ -166,7 +167,140 @@
 					}
 				}
 			}
-		}
-	}
+		},
+		"StartLamFunc": {
+			"Type": "AWS::Lambda::Function",
+			"Properties": {
+				"Handler": {
+					"Fn::Join": ["", [{
+						"Ref": "StartLamFuncName"
+					}, ".lambda_handler"]]
+				},
+				"Role": {
+					"Fn::GetAtt": ["SchedInstLamRole", "Arn"]
+				},
+				"Runtime": "python2.7",
+				"Timeout": "60",
+				"Code": {
+					"ZipFile": {
+						"Fn::Join": ["", [
+							"import boto3",
+							"import logging",
 
+							"# setup simple logging",
+							"for INFO",
+							"logger = logging.getLogger()",
+							"logger.setLevel(logging.INFO)",
+
+							"#define the connection",
+							"ec2 = boto3.resource('ec2')",
+
+							"def lambda_handler(event, context):",
+							"#Use the filter() method of the instances collection to retrieve# all running EC2 instances.",
+							"filters = [{",
+							"'Name': 'tag:", {
+								"Ref": "TagName"
+							}, "',",
+							"'Values': ['", {
+								"Ref": "TagValue"
+							}, "']",
+							"}, {",
+							"'Name': 'instance-state-name',",
+							"'Values': ['stopped']",
+							"}]",
+
+							"# filter the instances",
+							"instances = ec2.instances.filter(Filters = filters)",
+
+							"# locate all running instances",
+							"StoppedInstances = [instance.id for instance in instances]",
+
+							"# print the instances for logging purposes",
+							"# print StoppedInstances",
+
+							"# make sure there are actually instances to startup.",
+							"if len(StoppedInstances) > 0:",
+							"#perform the startup",
+							"StartUp = ec2.instances.filter(InstanceIds = RunningInstances).start()",
+							"print StartingUp",
+							"else :",
+							"print \"Nothing to see here\""
+						]]
+
+					}
+				}
+			}
+		},
+		"StopSchedEvent" : {
+			"Type": "AWS::Events::Rule",
+			"Properties": {
+				"Description": {"Fn::Join": ["", "EventName =", {"Ref": "StopEventName"}, ", instance stop cloudwatch event scheule" ]},
+				"ScheduleExpression": {"Ref": "StopEventExpression"},
+				"State": "ENABLED",
+				"Targets": [{
+					"Arn": {"Fn:GetAtt": ["StopLamFunc", "Arn"]},
+					"Id": "1"
+					}]
+
+			}
+		},
+		"StartSchedEvent" : {
+			"Type": "AWS::Events::Rule",
+			"Properties": {
+				"Description": {"Fn::Join": ["", "EventName =", {"Ref": "StartEventName"}, ", instance stop cloudwatch event scheule" ]},
+				"ScheduleExpression": {"Ref": "StartEventExpression"},
+				"State": "ENABLED",
+				"Targets": [{
+					"Arn": {"Fn::GetAtt": ["StartLamFunc", "Arn"]},
+					"Id": "1"
+					}]
+
+			}
+		},
+		"StopLamPerms": {
+			"Type": "AWS:Lambda::Permission",
+			"Properties": {
+				"FunctionName": {"Fn::GetAtt": ["StopLamFunc", "Arn"]},
+				"Action": "lambda.InvokeFunction",
+				"Principal": "events.amazonaws.com",
+				"SourceArn": {"Fn::GetAtt": ["StopSchedEvent", "Arn"]}
+			}
+		},
+		"StartLamPerms": {
+			"Type": "AWS:Lambda::Permission",
+			"Properties": {
+				"FunctionName": {"Fn::GetAtt": ["StartLamFunc", "Arn"]},
+				"Action": "lambda.InvokeFunction",
+				"Principal": "events.amazonaws.com",
+				"SourceArn": {"Fn::GetAtt": ["StartSchedEvent", "Arn"]}
+			}
+		}
+	},
+	"Outputs" : {
+			"LambdaPolicyArn" : {
+				"Value": {
+					"Ref": "SchedInstLamRole"
+				}
+			},
+			"LambdaStopFunctionArn": {
+				"Value": {
+					"Fn::GetAtt": ["StopLamFunc", "Arn"]
+				}
+			},
+			"LambdaStartFunctionArn": {
+				"Value": {
+					"Fn::GetAtt": ["StartLamFunc", "Arn"]
+				}
+			},
+			"StopEventSourceArn": {
+				"Value": {
+					"Fn::GetAtt": ["StopSchedEvent", "Arn"]
+				}
+			},
+			"StartEventSourceArn": {
+				"Value": {
+					"Fn::GetAtt": ["StartSchedEvent", "Arn"]
+				}
+			}
+	}
 }
