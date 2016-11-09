@@ -59,7 +59,7 @@
 	},
 	"Resources": {
 		"SchedInstLamRole": {
-			"Type": "AWS::IAM::Policy",
+			"Type": "AWS::IAM::Role",
 			"Properties": {
 				"AssumeRolePolicyDocument": {
 					"Version": "2012-10-17",
@@ -71,39 +71,42 @@
 						"Action": "sts:AssumeRole"
 					}]
 				},
-				"PolicyName": "Sched-Instances-Lambda-Role",
-				"PolicyDocument": {
-					"Version": "2012-10-17",
-					"Statement": [{
-						"Effect": "Allow",
-						"Action": [
-							"ec2:Describe*"
-						],
-						"Resource": "*"
-					}, {
-						"Effect": "Allow",
-						"Action": [
-							"logs:CreateLogGroup",
-							"logs:CreateLogStream",
-							"logs:PutLogEvents"
-						],
-						"Resource": "arn:aws:logs:*:*:*"
-					}, {
-						"Effect": "Allow",
-						"Action": [
-							"ec2:Describe*",
-							"ec2:StartInstances",
-							"ec2:StopInstances",
-							"ec2:RebootInstances"
-						],
-						"Condition": {
-							"StringEquals": {
-								"ec2:ResourceTag/AutoOff": "True"
-							}
-						},
-						"Resource": "*"
-					}]
-				}
+				"Path": "/",
+				"Policies": [ {
+					"PolicyName": "Sched-Instances-Lambda-Role",
+					"PolicyDocument": {
+						"Version": "2012-10-17",
+						"Statement": [{
+							"Effect": "Allow",
+							"Action": [
+								"ec2:Describe*"
+							],
+							"Resource": "*"
+						}, {
+							"Effect": "Allow",
+							"Action": [
+								"logs:CreateLogGroup",
+								"logs:CreateLogStream",
+								"logs:PutLogEvents"
+							],
+							"Resource": "arn:aws:logs:*:*:*"
+						}, {
+							"Effect": "Allow",
+							"Action": [
+								"ec2:Describe*",
+								"ec2:StartInstances",
+								"ec2:StopInstances",
+								"ec2:RebootInstances"
+							],
+							"Condition": {
+								"StringEquals": {
+									"Fn::Join": ["","ec2:ResourceTag/",{"Ref": "TagName"},":", {"Ref": "TagValue"}]
+								}
+							},
+							"Resource": "*"
+						}]
+					}
+				}]
 			}
 		},
 		"StopLamFunc": {
